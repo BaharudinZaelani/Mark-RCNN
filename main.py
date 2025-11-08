@@ -116,6 +116,7 @@ class ChickenDataset(utils.Dataset):
             return np.empty((0, 0, 0)), np.array([], dtype=np.int32)
 
 # Main
+config = ChickenConfig()
 # Root directory of the project
 ROOT_DIR = os.path.abspath("/content/Mask_RCNN/mrcnn")
 
@@ -132,21 +133,6 @@ COCO_WEIGHTS_PATH = os.path.join("/content/Mask_RCNN", "mask_rcnn_coco.h5")
 # Assuming ROOT_DIR is defined elsewhere, replace with appropriate path if not
 # DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = os.path.join("/content/Mask_RCNN", "logs")
-
-# Load and display random samples
-os.makedirs("sample", exist_ok=True)
-
-image_ids = np.random.choice(dataset_train.image_ids, 4)
-for idx, image_id in enumerate(image_ids):
-    image = dataset_train.load_image(image_id)
-    mask, class_ids = dataset_train.load_mask(image_id)
-    visualize.display_top_masks(image, mask, class_ids, dataset_train.class_names)
-    
-    # simpan ke folder sample/
-    output_path = f"sample/output_{idx}.png"
-    plt.savefig(output_path, bbox_inches='tight')
-    plt.close()  # tutup figure biar tidak numpuk di memori
-    print(f"Gambar disimpan: {output_path}")
 
 # Training
 train_dir = '/content/drive/MyDrive/ChickenDataset'
@@ -169,13 +155,25 @@ print(f"Validation images: {len(dataset_val.image_ids)}")
 print(f"Classes: {dataset_train.class_names}")
 print("="*70)
 
-chickenConfig = ChickenConfig()
+# Load and display random samples
+os.makedirs("sample", exist_ok=True)
+image_ids = np.random.choice(dataset_train.image_ids, 4)
+for idx, image_id in enumerate(image_ids):
+    image = dataset_train.load_image(image_id)
+    mask, class_ids = dataset_train.load_mask(image_id)
+    visualize.display_top_masks(image, mask, class_ids, dataset_train.class_names)
+    
+    # simpan ke folder sample/
+    output_path = f"sample/output_{idx}.png"
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()  # tutup figure biar tidak numpuk di memori
+    print(f"Gambar disimpan: {output_path}")
 
+# Create Model
 print("Creating Mask R-CNN model...")
-
 model = modellib.MaskRCNN(
     mode="training",
-    config=chickenConfig,
+    config=config,
     model_dir='/content/drive/MyDrive/chicken_project/logs'
 )
 
@@ -188,7 +186,7 @@ model.load_weights(
 model.train(
     train_dataset=dataset_train,
     val_dataset=dataset_val,
-    learning_rate=chickenConfig.LEARNING_RATE,
+    learning_rate=config.LEARNING_RATE,
     epochs=1,
     layers='heads'
 )
