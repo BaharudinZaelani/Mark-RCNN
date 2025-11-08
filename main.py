@@ -11,13 +11,15 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import keras
 import mrcnn.model
+import warnings
+
 from mrcnn.config import Config
 from mrcnn import utils
 from mrcnn import visualize
 from mrcnn.visualize import display_instances
 from IPython.display import Image, display
+from datetime import datetime
 from mrcnn import model as modellib
-import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="skimage")
 
 class ChickenConfig(Config):
@@ -202,7 +204,7 @@ log_info("Model Mask R-CNN berhasil dibuat.")
 log_step("MEMUAT BOBOT COCO (TRANSFER LEARNING)")
 
 model.load_weights(
-    filepath='mask_rcnn_coco.h5',
+    filepath='/content/Mask_RCNN/mask_rcnn_coco.h5',
     by_name=True,
     exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
 )
