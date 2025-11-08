@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import sys
+import time
 import datetime
 import numpy as np
 import skimage.draw
@@ -16,6 +17,8 @@ from mrcnn import visualize
 from mrcnn.visualize import display_instances
 from IPython.display import Image, display
 from mrcnn import model as modellib
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="skimage")
 
 class ChickenConfig(Config):
 
@@ -115,73 +118,98 @@ class ChickenDataset(utils.Dataset):
         else:
             return np.empty((0, 0, 0)), np.array([], dtype=np.int32)
 
-# Main
+# Fungsi untuk log tahapan
+def log_step(title):
+    print("\n" + "=" * 70)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {title}")
+    print("=" * 70)
+
+# Fungsi untuk log sub-progress
+def log_info(msg):
+    print(f"  → {msg}")
+
+# === 1️⃣ Setup Awal ===
+log_step("INISIALISASI KONFIGURASI DAN PATH")
+
 config = ChickenConfig()
-# Root directory of the project
+
 ROOT_DIR = os.path.abspath("/content/Mask_RCNN/mrcnn")
+sys.path.append(ROOT_DIR)
 
-# Import Mask RCNN
-sys.path.append(ROOT_DIR)  # To find local version of the library
-
-# Path to trained weights file
-# Assuming ROOT_DIR is defined elsewhere, replace with appropriate path if not
-# COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 COCO_WEIGHTS_PATH = os.path.join("/content/Mask_RCNN", "mask_rcnn_coco.h5")
-
-# Directory to save logs and model checkpoints, if not provided
-# through the command line argument --logs
-# Assuming ROOT_DIR is defined elsewhere, replace with appropriate path if not
-# DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_LOGS_DIR = os.path.join("/content/Mask_RCNN", "logs")
 
-# Training
+log_info(f"Root Dir        : {ROOT_DIR}")
+log_info(f"COCO Weights    : {COCO_WEIGHTS_PATH}")
+log_info(f"Logs Directory  : {DEFAULT_LOGS_DIR}")
+
+# === 2️⃣ Load Dataset ===
+log_step("MEMUAT DATASET LATIHAN DAN VALIDASI")
+
 train_dir = '/content/drive/MyDrive/ChickenDataset'
-val_dir = '/content/drive/MyDrive/ChickenDataset/'
+val_dir   = '/content/drive/MyDrive/ChickenDataset'
 
 dataset_train = ChickenDataset()
 dataset_train.load_chickens(train_dir, "training")
 dataset_train.prepare()
+log_info(f"Dataset training dimuat dari: {train_dir}")
 
 dataset_val = ChickenDataset()
 dataset_val.load_chickens(val_dir, "validation")
 dataset_val.prepare()
+log_info(f"Dataset validasi dimuat dari: {val_dir}")
 
-# Summary LOG
-print("\n" + "="*70)
-print("DATASET SUMMARY")
-print("="*70)
-print(f"Training images: {len(dataset_train.image_ids)}")
-print(f"Validation images: {len(dataset_val.image_ids)}")
-print(f"Classes: {dataset_train.class_names}")
-print("="*70)
+# === 3️⃣ Summary Dataset ===
+log_step("RINGKASAN DATASET")
+print(f"Training images : {len(dataset_train.image_ids)}")
+print(f"Validation imgs : {len(dataset_val.image_ids)}")
+print(f"Classes         : {dataset_train.class_names}")
 
-# Load and display random samples
-os.makedirs("sample", exist_ok=True)
-image_ids = np.random.choice(dataset_train.image_ids, 4)
+# === 4️⃣ Visualisasi Sampel ===
+log_step("GENERATE SAMPEL VISUALISASI DAN SIMPAN KE GOOGLE DRIVE")
+
+# Path tujuan di Google Drive
+drive_sample_dir = '/content/drive/MyDrive/ChickenDataset/samples'
+if not os.path.exists(drive_sample_dir):
+    os.makedirs(drive_sample_dir, exist_ok=True)
+    log_info(f"Folder belum ada. Membuat folder baru di Google Drive: {drive_sample_dir}")
+else:
+    log_info(f"Folder sudah ada: {drive_sample_dir}")
+
+# Pilih acak 1 gambar untuk divisualisasikan
+image_ids = np.random.choice(dataset_train.image_ids, 1)
+
 for idx, image_id in enumerate(image_ids):
     image = dataset_train.load_image(image_id)
     mask, class_ids = dataset_train.load_mask(image_id)
     visualize.display_top_masks(image, mask, class_ids, dataset_train.class_names)
-    
-    # simpan ke folder sample/
-    output_path = f"sample/output_{idx}.png"
-    plt.savefig(output_path, bbox_inches='tight')
-    plt.close()  # tutup figure biar tidak numpuk di memori
-    print(f"Gambar disimpan: {output_path}")
 
-# Create Model
-print("Creating Mask R-CNN model...")
+    # Simpan hasil visualisasi ke Google Drive
+    output_path = os.path.join(drive_sample_dir, f"output_{idx}.png")
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
+    log_info(f"Gambar disimpan di Google Drive: {output_path}")
+
+
 model = modellib.MaskRCNN(
     mode="training",
     config=config,
     model_dir='/content/drive/MyDrive/chicken_project/logs'
 )
+log_info("Model Mask R-CNN berhasil dibuat.")
+
+# === 6️⃣ Load Pretrained Weights ===
+log_step("MEMUAT BOBOT COCO (TRANSFER LEARNING)")
 
 model.load_weights(
     filepath='mask_rcnn_coco.h5',
     by_name=True,
-    exclude=["mrcnn_class_logits", "mrcnn_bbox_fc",  "mrcnn_bbox", "mrcnn_mask"]
+    exclude=["mrcnn_class_logits", "mrcnn_bbox_fc", "mrcnn_bbox", "mrcnn_mask"]
 )
+log_info("Bobot COCO berhasil dimuat.")
+
+# === 7️⃣ Proses Training ===
+log_step("MEMULAI PROSES TRAINING")
 
 model.train(
     train_dataset=dataset_train,
@@ -191,8 +219,12 @@ model.train(
     layers='heads'
 )
 
+# === 8️⃣ Simpan Model Hasil Training ===
+log_step("MENYIMPAN HASIL MODEL TERLATIH")
+
 model_path = 'chicken_mask_rcnn_trained.h5'
 model.keras_model.save_weights(model_path)
+log_info(f"Model tersimpan: {model_path}")
 
 # Prediciton
 
